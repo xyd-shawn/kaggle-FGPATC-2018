@@ -3,3 +3,6 @@ data/
 
 # submissions
 submission/
+
+# checkpoints
+src/.ipynb_checkpoints/
