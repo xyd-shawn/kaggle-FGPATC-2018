@@ -9,3 +9,6 @@ src/.ipynb_checkpoints/
 
 # tmp
 tmp/
+
+# results
+results/
