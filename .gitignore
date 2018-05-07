@@ -6,3 +6,6 @@ submission/
 
 # checkpoints
 src/.ipynb_checkpoints/
+
+# tmp
+tmp/
