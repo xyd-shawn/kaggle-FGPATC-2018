@@ -37,11 +37,11 @@ class Config(object):
         else:
             self.dim = (self.audio_length, 1)
 
-        if not os.path.exists("../results/")
+        if not os.path.exists("../results/"):
             os.mkdir("../results/")        
-        if not os.path.exists("../tmp/")
+        if not os.path.exists("../tmp/"):
             os.mkdir("../tmp/")       
-        if not os.path.exists("../logs/")
+        if not os.path.exists("../logs/"):
             os.mkdir("../logs/")
 
 
@@ -50,9 +50,9 @@ class Model1(object):
     def __init__(self, config):
         self.config = config
         self.model = self.__build_model()         
-        if not os.path.exists("../tmp/model_1/")
+        if not os.path.exists("../tmp/model_1/"):
             os.mkdir("../tmp/model_1/")
-        if not os.path.exists("../logs/model_1/")
+        if not os.path.exists("../logs/model_1/"):
             os.mkdir("../logs/model_1/")
 
     def __build_model(self):
@@ -134,9 +134,9 @@ class Model2(object):
     def __init__(self, config):
         self.config = config
         self.model = self.__build_model()        
-        if not os.path.exists("../tmp/model_2/")
+        if not os.path.exists("../tmp/model_2/"):
             os.mkdir("../tmp/model_2/")
-        if not os.path.exists("../logs/model_2/")
+        if not os.path.exists("../logs/model_2/"):
             os.mkdir("../logs/model_2/")
 
     def __build_model(self):
