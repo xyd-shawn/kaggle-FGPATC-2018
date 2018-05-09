@@ -7,6 +7,7 @@ config1 = {
         'n_classes': 41,
         'use_mfcc': False,
         'n_mfcc': 20,
+        'use_folds': False,
         'n_folds': 10,
         'learning_rate': 0.001,
         'max_epochs': 50,
@@ -14,6 +15,8 @@ config1 = {
         'audio_pad_method': 'constant',
         'data_dir': '../data/',
         'log_dir': '../logs/',
-        'tmp_dir': '../tmp/'
+        'tmp_dir': '../tmp/',
+        'model_name': 'model_1',
+        'run_time': 1
 }
 
