@@ -7,5 +7,17 @@ submission/
 # checkpoints
 src/.ipynb_checkpoints/
 
+# vim
+*.~
+
 # tmp
 tmp/
+
+# logs
+logs/
+
+# results
+results/
+
+# 
+.idea/
