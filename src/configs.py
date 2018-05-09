@@ -10,9 +10,9 @@ config1 = {
         'n_folds': 10,
         'learning_rate': 0.001,
         'max_epochs': 50,
-        'optimizer': 'sgd',
+        'optimizer': 'adam',
         'audio_pad_method': 'constant',
-        'data_dir': '../data/freesound-audio-tagging/',
+        'data_dir': '../data/',
         'log_dir': '../logs/',
         'tmp_dir': '../tmp/'
 }

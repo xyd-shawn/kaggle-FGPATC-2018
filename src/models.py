@@ -6,8 +6,8 @@ from keras.activations import relu, softmax
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from keras.layers import Input, Dense, Convolution1D, Dropout, GlobalMaxPool1D, MaxPool1D
 
-from .data_process import DataGenerator
-from .utils import *
+from data_process import DataGenerator
+from utils import *
 
 
 class Config(object):
@@ -20,9 +20,10 @@ class Config(object):
         self.n_folds = kwargs.get('n_folds', 10)
         self.learning_rate = kwargs.get('learning_rate', 0.001)
         self.max_epochs = kwargs.get('max_epochs', 50)
+        self.batch_size = kwargs.get('batch_size', 64)
         self.optimizer = kwargs.get('optimizer', 'sgd')
         self.audio_pad_method = kwargs.get('audio_pad_method', 'constant')
-        self.data_dir = kwargs.get('data_dir', '../data/freesound-audio-tagging/')
+        self.data_dir = kwargs.get('data_dir', '../data/')
         self.log_dir = kwargs.get('log_dir', '../logs/')
         self.audio_length = self.sampling_rate * self.audio_duration
         if self.use_mfcc:
