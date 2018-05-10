@@ -10,6 +10,7 @@ from keras.layers import Convolution1D, MaxPool1D, Convolution2D, MaxPool2D
 from data_process import DataGenerator
 from utils import *
 
+import os
 
 class Config(object):
     def __init__(self, **kwargs):
@@ -36,6 +37,13 @@ class Config(object):
         else:
             self.dim = (self.audio_length, 1)
 
+        if not os.path.exists("../results/"):
+            os.mkdir("../results/")        
+        if not os.path.exists("../tmp/"):
+            os.mkdir("../tmp/")       
+        if not os.path.exists("../logs/"):
+            os.mkdir("../logs/")
+
 
 class BaseModel(object):
     def __init__(self, config):
@@ -46,7 +54,11 @@ class Model1(object):
     # implement Conv1D
     def __init__(self, config):
         self.config = config
-        self.model = self.__build_model()
+        self.model = self.__build_model()         
+        if not os.path.exists("../tmp/model_1/"):
+            os.mkdir("../tmp/model_1/")
+        if not os.path.exists("../logs/model_1/"):
+            os.mkdir("../logs/model_1/")
 
     def __build_model(self):
         inp = Input(shape=(self.config.audio_length, 1))
@@ -126,7 +138,11 @@ class Model2(object):
     # implement Conv2D
     def __init__(self, config):
         self.config = config
-        self.model = self.__build_model()
+        self.model = self.__build_model()        
+        if not os.path.exists("../tmp/model_2/"):
+            os.mkdir("../tmp/model_2/")
+        if not os.path.exists("../logs/model_2/"):
+            os.mkdir("../logs/model_2/")
 
     def __build_model(self):
         inp = Input(shape=(self.config.dim[0], self.config.dim[1], 1))
