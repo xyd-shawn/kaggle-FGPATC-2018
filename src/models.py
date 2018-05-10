@@ -37,6 +37,11 @@ class Config(object):
             self.dim = (self.audio_length, 1)
 
 
+class BaseModel(object):
+    def __init__(self, config):
+        self.config = config
+
+
 class Model1(object):
     # implement Conv1D
     def __init__(self, config):
