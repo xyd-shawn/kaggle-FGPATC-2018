@@ -14,6 +14,5 @@ src/
 logs/
 tmp/
 submission/
-results/
 ``` 
 
