@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from keras import losses, models, optimizers
 from keras.activations import relu, softmax
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
@@ -48,6 +48,13 @@ class Config(object):
 class BaseModel(object):
     def __init__(self, config):
         self.config = config
+        self.__build_model()
+
+    def __build_model(self):
+        return model
+
+    def fit(self, lis):
+
 
 
 class Model1(object):
@@ -77,7 +84,7 @@ class Model1(object):
         x = Flatten()(x)
         x = Dropout(0.25)(x)
 
-        x = Dense(1024, activation=relu)(x)
+        x = Dense(512, activation=relu)(x)
         x = Dropout(0.5)(x)
         out = Dense(self.config.n_classes, activation=softmax)(x)
 
@@ -92,6 +99,8 @@ class Model1(object):
         return model
 
     def fit(self, list_IDs, labels):
+        if self.config.use_folds:
+
         train_list_IDs, val_list_IDs, train_labels, val_labels = train_test_split(list_IDs, labels, test_size=0.3)
         train_data_dir = self.config.data_dir + 'audio_train/'
         train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, audio_norm_min_max)
