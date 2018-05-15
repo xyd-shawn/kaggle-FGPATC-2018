@@ -31,7 +31,7 @@ if __name__ == '__main__':
     print(val_label.shape)
 
     ensemble_model = XGBClassifier(max_depth=8, n_estimators=100)
-    ensemble_model.fit(train_set, sample_weight=train_weight)
+    ensemble_model.fit(train_set, train_label, sample_weight=train_weight)
 
     val_pred = ensemble_model.predict(val_set)
     print(accuracy_score(val_pred, val_label))
