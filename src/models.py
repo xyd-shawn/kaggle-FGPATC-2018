@@ -132,11 +132,11 @@ class Model1(object):
 
     def get_features(self, list_IDs, audio_path):
         audio_data_dir = self.config.data_dir + audio_path
-        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-2].output)
+        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
         data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
         self.model.load_weights(self.config.tmp_dir + 'model_1/' + 'best_%d.h5' % self.config.run_time)
         extract_features = feature_model.predict_generator(data_generator,
-                                                           user_multiprocessing=True,
+                                                           use_multiprocessing=True,
                                                            workers=6,
                                                            max_queue_size=20,
                                                            verbose=1)
@@ -224,11 +224,11 @@ class Model2(object):
 
     def get_features(self, list_IDs, audio_path):
         audio_data_dir = self.config.data_dir + audio_path
-        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-2].output)
+        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
         data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
         self.model.load_weights(self.config.tmp_dir + 'model_2/' + 'best_%d.h5' % self.config.run_time)
         extract_features = feature_model.predict_generator(data_generator,
-                                                           user_multiprocessing=True,
+                                                           use_multiprocessing=True,
                                                            workers=6,
                                                            max_queue_size=20,
                                                            verbose=1)
