@@ -63,8 +63,8 @@ class BaseModel(object):
         train_data_dir = self.config.data_dir + 'audio_train/'
         if self.config.use_folds:
             history = []
-            skf = StratifiedKFold(list_IDs, n_folds=self.config.n_folds)
-            for i, (train_split, val_split) in enumerate(skf):
+            skf = StratifiedKFold(n_splits=self.config.n_folds)
+            for i, (train_split, val_split) in enumerate(skf.split(list_IDs, labels)):
                 train_list_IDs, val_list_IDs = list_IDs[train_split], list_IDs[val_split]
                 train_labels, val_labels = labels[train_split], labels[val_split]
                 checkpoint = ModelCheckpoint(self.config.tmp_dir + self.config.model_name
@@ -79,13 +79,11 @@ class BaseModel(object):
                 callbacks_list = [checkpoint, early_stop, tb]
 
                 print("Fold: ", i)
-                train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, batch_size=64,
-                                                preprocessing_fn=audio_norm_min_max)
-                val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, batch_size=64,
-                                              preprocessing_fn=audio_norm_min_max)
+                train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, audio_norm_min_max)
+                val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, audio_norm_min_max)
                 res = self.model.fit_generator(train_generator,
                                                    callbacks=callbacks_list,
-                                                   validation_data=val_generator,
+                                                   validation_data=val_generator, 
                                                    epochs=self.config.max_epochs,
                                                    use_multiprocessing=True,
                                                    workers=6,
@@ -168,6 +166,7 @@ class Model1(BaseModel):
     # implement Conv1D
     def __init__(self, config):
         super(Model1, self).__init__(config)
+        self.model = self.__build_model()
 
     def __build_model(self):
         inp = Input(shape=(self.config.audio_length, 1))
@@ -206,6 +205,7 @@ class Model2(BaseModel):
     # implement Conv2D
     def __init__(self, config):
         super(Model2, self).__init__(config)
+        self.model = self.__build_model()
 
     def __build_model(self):
         inp = Input(shape=(self.config.dim[0], self.config.dim[1], 1))
