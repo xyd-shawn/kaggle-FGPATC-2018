@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import os
+
+import numpy as np
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from keras import losses, models, optimizers
 from keras.activations import relu, softmax
@@ -28,7 +31,7 @@ class Config(object):
         self.audio_pad_method = kwargs.get('audio_pad_method', 'constant')
         self.data_dir = kwargs.get('data_dir', '../data/')
         self.log_dir = kwargs.get('log_dir', '../logs/')
-        self.tmp_dir = kwargs.get('tmp_dir', '../tmp')
+        self.tmp_dir = kwargs.get('tmp_dir', '../tmp/')
         self.model_name = kwargs.get('model_name', 'model_1')
         self.run_time = kwargs.get('run_time', 1)
         self.audio_length = self.sampling_rate * self.audio_duration
@@ -37,35 +40,130 @@ class Config(object):
         else:
             self.dim = (self.audio_length, 1)
 
-        if not os.path.exists("../results/"):
-            os.mkdir("../results/")        
-        if not os.path.exists("../tmp/"):
-            os.mkdir("../tmp/")       
-        if not os.path.exists("../logs/"):
-            os.mkdir("../logs/")
+        if not os.path.exists(self.tmp_dir):
+            os.mkdir(self.tmp_dir)
+        if not os.path.exists(self.tmp_dir + self.model_name + '_%d/' % self.run_time):
+            os.mkdir(self.tmp_dir + self.model_name + '_%d/' % self.run_time)
 
 
 class BaseModel(object):
     def __init__(self, config):
         self.config = config
-        self.__build_model()
+        self.model = self.__build_model()
 
     def __build_model(self):
+        inp = Input(shape=(self.config.audio_length, 1))
+        out = Dense(self.config.n_classes, activation=softmax)(inp)
+        model = models.Model(inputs=inp, outputs=out)
+        opt = optimizers.Adam(lr=self.config.learning_rate)
+        model.compile(optimizer=opt, loss=losses.categorical_crossentropy, metrics=['acc'])
         return model
 
-    def fit(self, lis):
+    def fit(self, list_IDs, labels):
+        train_data_dir = self.config.data_dir + 'audio_train/'
+        if self.config.use_folds:
+            history = []
+            skf = StratifiedKFold(list_IDs, n_folds=self.config.n_folds)
+            for i, (train_split, val_split) in enumerate(skf):
+                train_list_IDs, val_list_IDs = list_IDs[train_split], list_IDs[val_split]
+                train_labels, val_labels = labels[train_split], labels[val_split]
+                checkpoint = ModelCheckpoint(self.config.tmp_dir + self.config.model_name
+                                             + '_%d/best_%d.h5' % (self.config.run_time, i),
+                                             monitor='val_loss',
+                                             verbose=1,
+                                             save_best_only=True)
+                early_stop = EarlyStopping(monitor="val_loss", mode="min", patience=10)
+                tb = TensorBoard(log_dir=self.config.log_dir + self.config.model_name
+                                         + '_%d/fold_%d' % (self.config.run_time, i),
+                                 write_graph=True)
+                callbacks_list = [checkpoint, early_stop, tb]
+
+                print("Fold: ", i)
+                train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, batch_size=64,
+                                                preprocessing_fn=audio_norm_min_max)
+                val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, batch_size=64,
+                                              preprocessing_fn=audio_norm_min_max)
+                res = self.model.fit_generator(train_generator,
+                                                   callbacks=callbacks_list,
+                                                   validation_data=val_generator,
+                                                   epochs=self.config.max_epochs,
+                                                   use_multiprocessing=True,
+                                                   workers=6,
+                                                   max_queue_size=20)
+                history.append(res)
+        else:
+            train_list_IDs, val_list_IDs, train_labels, val_labels = train_test_split(list_IDs, labels, test_size=0.3)
+            train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, audio_norm_min_max)
+            val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, audio_norm_min_max)
+            checkpoint = ModelCheckpoint(self.config.tmp_dir + self.config.model_name + '_%d/best.h5' % self.config.run_time,
+                                         monitor='val_loss', verbose=1, save_best_only=True)
+            early_stop = EarlyStopping(monitor="val_loss", mode="min", patience=10)
+            tb = TensorBoard(log_dir=self.config.log_dir + self.config.model_name + '_%d' % self.config.run_time, write_graph=True)
+            callbacks_list = [checkpoint, early_stop, tb]
+            history = self.model.fit_generator(train_generator,
+                                               callbacks=callbacks_list,
+                                               validation_data=val_generator,
+                                               epochs=self.config.max_epochs,
+                                               use_multiprocessing=True,
+                                               workers=6,
+                                               max_queue_size=20)
+        return history
+
+    def predict(self, list_IDs):
+        test_data_dir = self.config.data_dir + 'audio_test/'
+        test_generator = DataGenerator(self.config, test_data_dir, list_IDs, None, audio_norm_min_max)
+        if self.config.use_folds:
+            for i in range(self.config.n_folds):
+                print('Fold: ', i)
+                self.model.load_weights(self.config.tmp_dir + self.config.model_name
+                                        + '_%d/best_%d.h5' % (self.config.run_time, i))
+                predictions = self.model.predict_generator(test_generator,
+                                                           use_multiprocessing=True,
+                                                           workers=6,
+                                                           max_queue_size=20,
+                                                           verbose=1)
+                np.save(self.config.tmp_dir + self.config.model_name + '_%d/pred_%d.npy' % (self.config.run_time, i),
+                        predictions)
+        else:
+            self.model.load_weights(self.config.tmp_dir + self.config.model_name + '_%d/best.h5' % self.config.model_name)
+            predictions = self.model.predict_generator(test_generator,
+                                                       use_multiprocessing=True,
+                                                       workers=6,
+                                                       max_queue_size=20,
+                                                       verbose=1)
+            np.save(self.config.tmp_dir + self.config.model_name + '_%d/pred.npy' % self.config.run_time, predictions)
+
+    def get_features(self, list_IDs, audio_path):
+        audio_data_dir = self.config.data_dir + audio_path
+        data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
+        if self.config.use_folds:
+            for i in range(self.config.n_folds):
+                print('Fold: ', i)
+                self.model.load_weights(self.config.tmp_dir + self.config.model_name
+                                        + '_%d/best_%d.h5' % (self.config.run_time, i))
+                feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
+                extract_features = feature_model.predict_generator(data_generator,
+                                                                   use_multiprocessing=True,
+                                                                   workers=6,
+                                                                   max_queue_size=20,
+                                                                   verbose=1)
+                np.save(self.config.tmp_dir + self.config.model_name + '_%d/features_%d.npy' % (self.config.run_time, i),
+                        extract_features)
+        else:
+            self.model.load_weights(self.config.tmp_dir + self.config.model_name + '_%d/best.h5' % self.config.run_time)
+            feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
+            extract_features = feature_model.predict_generator(data_generator,
+                                                               use_multiprocessing=True,
+                                                               workers=6,
+                                                               max_queue_size=20,
+                                                               verbose=1)
+            np.save(self.config.tmp_dir + self.config.model_name + '_%d/features.npy' % self.config.run_time, extract_features)
 
 
-
-class Model1(object):
+class Model1(BaseModel):
     # implement Conv1D
     def __init__(self, config):
-        self.config = config
-        self.model = self.__build_model()         
-        if not os.path.exists("../tmp/model_1/"):
-            os.mkdir("../tmp/model_1/")
-        if not os.path.exists("../logs/model_1/"):
-            os.mkdir("../logs/model_1/")
+        super(Model1, self).__init__(config)
 
     def __build_model(self):
         inp = Input(shape=(self.config.audio_length, 1))
@@ -81,6 +179,7 @@ class Model1(object):
 
         x = Convolution1D(256, 3, activation=relu, padding='same')(x)
         x = Convolution1D(256, 3, activation=relu, padding='same')(x)
+        x = MaxPool1D(16)(x)
         x = Flatten()(x)
         x = Dropout(0.25)(x)
 
@@ -98,87 +197,44 @@ class Model1(object):
         model.compile(optimizer=opt, loss=losses.categorical_crossentropy, metrics=['acc'])
         return model
 
-    def fit(self, list_IDs, labels):
-        if self.config.use_folds:
 
-        train_list_IDs, val_list_IDs, train_labels, val_labels = train_test_split(list_IDs, labels, test_size=0.3)
-        train_data_dir = self.config.data_dir + 'audio_train/'
-        train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, audio_norm_min_max)
-        val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, audio_norm_min_max)
-        checkpoint = ModelCheckpoint(self.config.tmp_dir + 'model_1/' + 'best_%d.h5' % self.config.run_time,
-                                     monitor='val_loss', verbose=1, save_best_only=True)
-        early_stop = EarlyStopping(monitor="val_loss", mode="min", patience=5)
-        tb = TensorBoard(log_dir=self.config.log_dir + 'model_1', write_graph=True)
-        callbacks_list = [checkpoint, early_stop, tb]
-        history = self.model.fit_generator(train_generator,
-                                           callbacks=callbacks_list,
-                                           validation_data=val_generator,
-                                           epochs=self.config.max_epochs,
-                                           use_multiprocessing=True,
-                                           workers=6,
-                                           max_queue_size=20)
-        return history
-
-    def predict(self, list_IDs):
-        test_data_dir = self.config.data_dir + 'audio_test/'
-        test_generator = DataGenerator(self.config, test_data_dir, list_IDs, None, audio_norm_min_max)
-        self.model.load_weights(self.config.tmp_dir + 'model_1/' + 'best_%d.h5' % self.config.run_time)
-        predictions = self.model.predict_generator(test_generator,
-                                                   use_multiprocessing=True,
-                                                   workers=6,
-                                                   max_queue_size=20,
-                                                   verbose=1)
-        return predictions
-
-    def get_features(self, list_IDs, audio_path):
-        audio_data_dir = self.config.data_dir + audio_path
-        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
-        data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
-        self.model.load_weights(self.config.tmp_dir + 'model_1/' + 'best_%d.h5' % self.config.run_time)
-        extract_features = feature_model.predict_generator(data_generator,
-                                                           use_multiprocessing=True,
-                                                           workers=6,
-                                                           max_queue_size=20,
-                                                           verbose=1)
-        return extract_features
 
 
 class Model2(object):
     # implement Conv2D
     def __init__(self, config):
-        self.config = config
-        self.model = self.__build_model()        
-        if not os.path.exists("../tmp/model_2/"):
-            os.mkdir("../tmp/model_2/")
-        if not os.path.exists("../logs/model_2/"):
-            os.mkdir("../logs/model_2/")
+        super(Model2, self).__init__(config)
 
     def __build_model(self):
         inp = Input(shape=(self.config.dim[0], self.config.dim[1], 1))
-        x = Convolution2D(32, (3, 3), padding='same')(inp)
-        x = Convolution2D(32, (3, 3), padding='same')(x)
+        x = BatchNormalization()(inp)
+
+        x = Convolution2D(32, (4, 10), padding='same')(x)
         x = BatchNormalization()(x)
         x = Activation("relu")(x)
         x = MaxPool2D()(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(64, (3, 3), padding='same')(x)
-        x = Convolution2D(64, (3, 3), padding='same')(x)
+        x = Convolution2D(32, (4, 10), padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation("relu")(x)
         x = MaxPool2D()(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(128, (3, 3), padding='same')(x)
-        x = Convolution2D(128, (3, 3), padding='same')(x)
+        x = Convolution2D(128, (4, 10), padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation("relu")(x)
         x = MaxPool2D()(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(256, (3, 3), padding='same')(x)
-        x = Convolution2D(256, (3, 3), padding='same')(x)
+        x = Convolution2D(128, (4, 10), padding='same')(x)
+        x = BatchNormalization()(x)
+        x = Activation("relu")(x)
         x = MaxPool2D()(x)
         x = Dropout(0.25)(x)
 
         x = Flatten()(x)
-        x = Dense(1024)(x)
+        x = Dense(256)(x)
         x = Dropout(0.5)(x)
         out = Dense(self.config.n_classes, activation=softmax)(x)
 
@@ -191,45 +247,3 @@ class Model2(object):
             opt = optimizers.SGD(self.config.learning_rate)
         model.compile(optimizer=opt, loss=losses.categorical_crossentropy, metrics=['acc'])
         return model
-
-    def fit(self, list_IDs, labels):
-        train_list_IDs, val_list_IDs, train_labels, val_labels = train_test_split(list_IDs, labels, test_size=0.3)
-        train_data_dir = self.config.data_dir + 'audio_train/'
-        train_generator = DataGenerator(self.config, train_data_dir, train_list_IDs, train_labels, audio_norm_min_max)
-        val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, audio_norm_min_max)
-        checkpoint = ModelCheckpoint(self.config.tmp_dir + 'model_2/' 'best_%d.h5' % self.config.run_time,
-                                     monitor='val_loss', verbose=1, save_best_only=True)
-        early_stop = EarlyStopping(monitor="val_loss", mode="min", patience=5)
-        tb = TensorBoard(log_dir=self.config.log_dir + 'model_2', write_graph=True)
-        callbacks_list = [checkpoint, early_stop, tb]
-        history = self.model.fit_generator(train_generator,
-                                           callbacks=callbacks_list,
-                                           validation_data=val_generator,
-                                           epochs=self.config.max_epochs,
-                                           use_multiprocessing=True,
-                                           workers=6,
-                                           max_queue_size=20)
-        return history
-
-    def predict(self, list_IDs):
-        test_data_dir = self.config.data_dir + 'audio_test/'
-        test_generator = DataGenerator(self.config, test_data_dir, list_IDs, None, audio_norm_min_max)
-        self.model.load_weights(self.config.tmp_dir + 'model_2/' + 'best_%d.h5' % self.config.run_time)
-        predictions = self.model.predict_generator(test_generator,
-                                                   use_multiprocessing=True,
-                                                   workers=6,
-                                                   max_queue_size=20,
-                                                   verbose=1)
-        return predictions
-
-    def get_features(self, list_IDs, audio_path):
-        audio_data_dir = self.config.data_dir + audio_path
-        feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
-        data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
-        self.model.load_weights(self.config.tmp_dir + 'model_2/' + 'best_%d.h5' % self.config.run_time)
-        extract_features = feature_model.predict_generator(data_generator,
-                                                           use_multiprocessing=True,
-                                                           workers=6,
-                                                           max_queue_size=20,
-                                                           verbose=1)
-        return extract_features

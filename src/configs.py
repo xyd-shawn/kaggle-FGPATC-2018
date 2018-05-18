@@ -5,6 +5,7 @@ config1 = {
         'audio_duration': 2,
         'batch_size': 64,
         'n_classes': 41,
+        'use_generator': True, 
         'use_mfcc': False,
         'n_mfcc': 20,
         'use_folds': False,
