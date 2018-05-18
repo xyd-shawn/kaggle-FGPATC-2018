@@ -21,10 +21,8 @@ if __name__ == '__main__':
 
     config = Config(**config1)
     model = Model1(config)
-    res = model.fit(train_file.index, train_file.label_idx)
-    predictions = model.predict(test_file.index)
-    top_3 = np.array(label_names)[np.argsort(-predictions, axis=1)[:, :3]]
-    predicted_labels = [' '.join(list(x)) for x in top_3]
-    test_file = pd.read_csv('../data/sample_submission.csv')
-    test_file['label'] = predicted_labels
-    test_file[['fname', 'label']].to_csv('../submission/sub_180509_01.csv', index=False)
+    _ = model.fit(train_file.index, train_file.label_idx)
+    model.predict(test_file.index)
+    model.get_features(train_file.index, 'audio_train/')
+    model.get_features(test_file.index, 'audio_test/')
+

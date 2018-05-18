@@ -136,28 +136,32 @@ class BaseModel(object):
     def get_features(self, list_IDs, audio_path):
         audio_data_dir = self.config.data_dir + audio_path
         data_generator = DataGenerator(self.config, audio_data_dir, list_IDs, None, audio_norm_min_max)
+        if audio_path.endswith('train/'):
+            ss = 'train_features'
+        else:
+            ss = 'test_features'
+        save_file = self.config.tmp_dir + self.config.model_name + '_%d/' % self.config.run_time
         if self.config.use_folds:
             for i in range(self.config.n_folds):
                 print('Fold: ', i)
-                self.model.load_weights(self.config.tmp_dir + self.config.model_name
-                                        + '_%d/best_%d.h5' % (self.config.run_time, i))
+                self.model.load_weights(save_file + 'best_%d.h5' % i)
                 feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
                 extract_features = feature_model.predict_generator(data_generator,
                                                                    use_multiprocessing=True,
                                                                    workers=6,
                                                                    max_queue_size=20,
                                                                    verbose=1)
-                np.save(self.config.tmp_dir + self.config.model_name + '_%d/features_%d.npy' % (self.config.run_time, i),
-                        extract_features)
+
+                np.save(save_file + ss + '_%d.npy' % i, extract_features)
         else:
-            self.model.load_weights(self.config.tmp_dir + self.config.model_name + '_%d/best.h5' % self.config.run_time)
+            self.model.load_weights(save_file + 'best.h5')
             feature_model = models.Model(inputs=self.model.input, outputs=self.model.layers[-3].output)
             extract_features = feature_model.predict_generator(data_generator,
                                                                use_multiprocessing=True,
                                                                workers=6,
                                                                max_queue_size=20,
                                                                verbose=1)
-            np.save(self.config.tmp_dir + self.config.model_name + '_%d/features.npy' % self.config.run_time, extract_features)
+            np.save(save_file + ss + '.npy', extract_features)
 
 
 class Model1(BaseModel):
@@ -198,9 +202,7 @@ class Model1(BaseModel):
         return model
 
 
-
-
-class Model2(object):
+class Model2(BaseModel):
     # implement Conv2D
     def __init__(self, config):
         super(Model2, self).__init__(config)
