@@ -13,7 +13,6 @@ from keras.layers import Convolution1D, MaxPool1D, Convolution2D, MaxPool2D
 from data_process import DataGenerator
 from utils import *
 
-import os
 
 class Config(object):
     def __init__(self, **kwargs):
@@ -83,7 +82,7 @@ class BaseModel(object):
                 val_generator = DataGenerator(self.config, train_data_dir, val_list_IDs, val_labels, audio_norm_min_max)
                 res = self.model.fit_generator(train_generator,
                                                    callbacks=callbacks_list,
-                                                   validation_data=val_generator, 
+                                                   validation_data=val_generator,
                                                    epochs=self.config.max_epochs,
                                                    use_multiprocessing=True,
                                                    workers=6,
